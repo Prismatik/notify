@@ -6,3 +6,9 @@ type Email struct {
 	From    string
 	To      string
 }
+
+type SMS struct {
+	To   string
+	Body string
+	From string
+}
