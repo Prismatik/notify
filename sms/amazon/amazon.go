@@ -1,7 +1,6 @@
 package amazonSms
 
 import (
-	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sns"
@@ -10,8 +9,6 @@ import (
 )
 
 func Send(m types.SMS) error {
-	fmt.Println("send called")
-
 	svc := sns.New(
 		session.New(),
 		&aws.Config{
