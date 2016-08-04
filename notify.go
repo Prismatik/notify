@@ -1,13 +1,16 @@
 package main
 
 import (
-	"github.com/gin-gonic/gin"
+	"encoding/json"
+	"github.com/gorilla/mux"
 	"github.com/prismatik/dotenv_safe"
 	"github.com/prismatik/notify/email"
 	"github.com/prismatik/notify/sms"
 	"github.com/prismatik/notify/types"
+	"log"
 	"net/http"
 	"os"
+	"time"
 )
 
 func init() {
@@ -29,29 +32,82 @@ func init() {
 }
 
 func main() {
-	r := gin.Default()
+	r := mux.NewRouter()
 
-	r.POST("/sms", func(c *gin.Context) {
-		var json types.SMS
-		if c.BindJSON(&json) == nil {
-			err := sms.Send(json)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-			}
-			c.JSON(http.StatusOK, gin.H{"status": "success"})
-		}
-	})
+	r.HandleFunc("/sms", SmsHandler).
+		Methods("POST")
 
-	r.POST("/email", func(c *gin.Context) {
-		var json types.Email
-		if c.BindJSON(&json) == nil {
-			err := email.Send(json)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-			}
-			c.JSON(http.StatusOK, gin.H{"status": "success"})
-		}
-	})
+	r.HandleFunc("/email", EmailHandler).
+		Methods("POST")
 
-	r.Run()
+	srv := &http.Server{
+		Handler:      r,
+		Addr:         ":" + os.Getenv("PORT"),
+		WriteTimeout: 15 * time.Second,
+		ReadTimeout:  15 * time.Second,
+	}
+	log.Fatal(srv.ListenAndServe())
+}
+
+func SmsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	decoder := json.NewDecoder(r.Body)
+	var t types.SMS
+
+	err := decoder.Decode(&t)
+	if err != nil {
+		errRes(w, http.StatusBadRequest)
+		return
+	}
+
+	err = sms.Send(t)
+	if err != nil {
+		errRes(w, http.StatusInternalServerError)
+		return
+	}
+
+	successRes(w)
+	return
+}
+
+func EmailHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	decoder := json.NewDecoder(r.Body)
+	var t types.Email
+
+	err := decoder.Decode(&t)
+	if err != nil {
+		errRes(w, http.StatusBadRequest)
+		return
+	}
+
+	err = email.Send(t)
+	if err != nil {
+		errRes(w, http.StatusInternalServerError)
+		return
+	}
+
+	successRes(w)
+	return
+}
+
+func errRes(w http.ResponseWriter, code int) {
+	resData := res{
+		Success: false,
+	}
+
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(resData)
+}
+
+func successRes(w http.ResponseWriter) {
+	resData := res{
+		Success: true,
+	}
+
+	json.NewEncoder(w).Encode(resData)
+}
+
+type res struct {
+	Success bool `json:"success"`
 }
